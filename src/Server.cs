@@ -172,7 +172,7 @@ public sealed class Server : IDisposable
 
             return true;
         }
-        catch
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             var nackBytes = Packet.NotAcknowledged(_version).Serialize();
 
