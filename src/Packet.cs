@@ -86,8 +86,6 @@ public readonly ref struct Packet
         var length = BitConverter.ToInt32(data[HeaderWithoutLengthSize..HeaderSize]);
         var packetData = data[HeaderSize..(HeaderSize + length)];
 
-        Packet packet = new(version, opCode, packetData);
-
-        return packet;
+        return new(version, opCode, packetData);
     }
 }
