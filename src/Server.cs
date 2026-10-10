@@ -18,10 +18,10 @@ public sealed class Server : IDisposable
         _version = version;
     }
 
-    public byte[] Listen()
-    {
-        _listener.Start();
+    public void Listen() => _listener.Start();
 
+    public byte[] Read()
+    {
         using var client = _listener.AcceptTcpClient();
         using var stream = client.GetStream();
 
@@ -45,7 +45,7 @@ public sealed class Server : IDisposable
 
                 resultStream.Write(packet.Data);
 
-                Packet.Success(PacketVersion.One).Serialize(packetData);
+                Packet.Success(_version).Serialize(packetData);
                 stream.Write(packetData);
 
                 if (packet.OpCode == PacketOpCode.SendFinal)
@@ -61,18 +61,14 @@ public sealed class Server : IDisposable
             Packet.Error(_version).Serialize(packetData);
             stream.Write(packetData);
 
+            Stop();
+
             return [];
-        }
-        finally
-        {
-            _listener.Stop();
         }
     }
 
-    public async Task<byte[]> ListenAsync(CancellationToken token = default)
+    public async Task<byte[]> ReadAsync(CancellationToken token = default)
     {
-        _listener.Start();
-        
         using var client = await _listener.AcceptTcpClientAsync(token);
         await using var stream = client.GetStream();
 
@@ -99,7 +95,7 @@ public sealed class Server : IDisposable
 
                 resultStream.Write(packet.Data);
 
-                Packet.Success(PacketVersion.One).Serialize(packetData);
+                Packet.Success(_version).Serialize(packetData);
                 await stream.WriteAsync(packetData, token);
 
                 if (packetOpCode == PacketOpCode.SendFinal)
@@ -115,13 +111,13 @@ public sealed class Server : IDisposable
             Packet.Error(_version).Serialize(packetData);
             await stream.WriteAsync(packetData, token);
 
+            Stop();
+
             return [];
         }
-        finally
-        {
-            _listener.Stop();
-        }
     }
+
+    public void Stop() => _listener.Stop();
 
     public void Dispose() => _listener.Dispose();
 
