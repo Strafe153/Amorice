@@ -10,20 +10,21 @@ public sealed class Client : IDisposable
     private readonly TcpClient _client;
     private readonly PacketVersion _version;
 
-    public Client(ushort port, PacketVersion version)
+    public Client(IPEndPoint endpoint, PacketVersion version)
     {
         PacketException.ThrowIfUnsupportedVersion(version);
         
-        IPAddress address = new([127, 0, 0, 1]);
-        IPEndPoint endpoint = new(address, port);
-
         _client = new(endpoint);
         _version = version;
     }
 
-    public void Send(IPEndPoint endpoint, Span<byte> data)
+    public Client(PacketVersion version) : this(new(IPAddress.Any, 0), version)
     {
-        _client.Connect(endpoint);
+    }
+
+    public void Send(IPEndPoint serverEndpoint, Span<byte> data)
+    {
+        _client.Connect(serverEndpoint);
 
         using var stream = _client.GetStream();
 

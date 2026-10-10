@@ -8,11 +8,11 @@ public readonly ref struct Packet
 {
     private const byte MagicSize = 2;
     private const byte HeaderWithoutLengthSize = MagicSize + sizeof(PacketVersion) + sizeof(PacketOpCode);
-    private const byte HeaderSize = HeaderWithoutLengthSize + sizeof(int);
-
+    
     private static readonly byte[] _magic = new byte[MagicSize] { 1, 7 };
     
     public const int Size = 4096;
+    public const byte HeaderSize = HeaderWithoutLengthSize + sizeof(int);
     public const int DataSize = Size - HeaderSize;
 
     public static Packet Hello(PacketVersion version) => new(version, PacketOpCode.Hello, []);
@@ -67,6 +67,8 @@ public readonly ref struct Packet
         PacketException.ThrowIfIncorrectOpCode(opCode);
 
         var length = BinaryPrimitives.ReadInt32BigEndian(data[HeaderWithoutLengthSize..HeaderSize]);
+        PacketException.ThrowIfIncorrectLength(data, length);
+        
         var packetData = data[HeaderSize..(HeaderSize + length)];
 
         return new(version, opCode, packetData);

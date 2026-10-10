@@ -16,6 +16,14 @@ public sealed class PacketException : Exception
     {
     }
 
+    public static void ThrowIfIncorrectLength(Span<byte> data, int length)
+    {
+        if (length < 0 || length > data.Length - Packet.HeaderSize)
+        {
+            throw new PacketException($"Incorrect packet length: {length}. Must be in range from 0 to {Packet.DataSize}");
+        }
+    }
+
     public static void ThrowIfUnsupportedVersion(PacketVersion version)
     {
         if (!Enum.IsDefined(version))

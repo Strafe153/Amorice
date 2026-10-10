@@ -10,12 +10,9 @@ public sealed class Server : IDisposable
     private readonly TcpListener _listener;
     private readonly PacketVersion _version;
 
-    public Server(ushort port, PacketVersion version)
+    public Server(IPEndPoint endpoint, PacketVersion version)
     {
         PacketException.ThrowIfUnsupportedVersion(version);
-
-        IPAddress address = new([127, 0, 0, 1]);
-        IPEndPoint endpoint = new(address, port);
 
         _listener = new(endpoint);
         _version = version;
@@ -39,14 +36,14 @@ public sealed class Server : IDisposable
                 return [];
             }
 
-            List<byte> resultData = [];
+            using MemoryStream resultStream = new();
 
             while (true)
             {
                 stream.ReadExactly(packetData);
                 var packet = Packet.Deserialize(packetData);
 
-                resultData.AddRange(packet.Data);
+                resultStream.Write(packet.Data);
 
                 Packet.Success(PacketVersion.One).Serialize(packetData);
                 stream.Write(packetData);
@@ -57,7 +54,7 @@ public sealed class Server : IDisposable
                 }
             }
 
-            return [.. resultData];
+            return resultStream.ToArray();
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -90,7 +87,7 @@ public sealed class Server : IDisposable
                 return [];
             }
 
-            List<byte> resultData = [];
+            await using MemoryStream resultStream = new();
 
             while (true)
             {
@@ -100,7 +97,7 @@ public sealed class Server : IDisposable
                 // Cannot be preserved across await boundary, thus value is copied beforehand
                 var packetOpCode = packet.OpCode;
 
-                resultData.AddRange(packet.Data);
+                resultStream.Write(packet.Data);
 
                 Packet.Success(PacketVersion.One).Serialize(packetData);
                 await stream.WriteAsync(packetData, token);
@@ -111,7 +108,7 @@ public sealed class Server : IDisposable
                 }
             }
 
-            return [.. resultData];
+            return resultStream.ToArray();
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
