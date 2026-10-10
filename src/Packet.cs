@@ -1,4 +1,5 @@
-﻿using Amorice.Enums;
+﻿using System.Buffers.Binary;
+using Amorice.Enums;
 using Amorice.Exceptions;
 
 namespace Amorice;
@@ -33,24 +34,6 @@ public readonly ref struct Packet
         Data = data;
     }
 
-    public byte[] Serialize()
-    {
-        var packetBytes = new byte[Size];
-
-        packetBytes[0] = _magic[0];
-        packetBytes[1] = _magic[1];
-        packetBytes[2] = (byte)Version;
-        packetBytes[3] = (byte)OpCode;
-
-        Span<byte> lengthBytes = packetBytes.AsSpan(HeaderWithoutLengthSize, sizeof(int));
-        BitConverter.GetBytes(Length).CopyTo(lengthBytes);
-
-        Span<byte> dataBytes = packetBytes.AsSpan(HeaderSize, Length);
-        Data.CopyTo(dataBytes);
-
-        return packetBytes;
-    }
-
     public void Serialize(Span<byte> destination)
     {
         destination[0] = _magic[0];
@@ -58,7 +41,7 @@ public readonly ref struct Packet
         destination[2] = (byte)Version;
         destination[3] = (byte)OpCode;
 
-        BitConverter.GetBytes(Length).CopyTo(destination[HeaderWithoutLengthSize..HeaderSize]);
+        BinaryPrimitives.WriteInt32BigEndian(destination[HeaderWithoutLengthSize..HeaderSize], Length);
 
         Data.CopyTo(destination[HeaderSize..(HeaderSize + Length)]);
     }
@@ -83,7 +66,7 @@ public readonly ref struct Packet
         PacketException.ThrowIfUnsupportedVersion(version);
         PacketException.ThrowIfIncorrectOpCode(opCode);
 
-        var length = BitConverter.ToInt32(data[HeaderWithoutLengthSize..HeaderSize]);
+        var length = BinaryPrimitives.ReadInt32BigEndian(data[HeaderWithoutLengthSize..HeaderSize]);
         var packetData = data[HeaderSize..(HeaderSize + length)];
 
         return new(version, opCode, packetData);

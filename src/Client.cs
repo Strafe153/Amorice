@@ -71,8 +71,9 @@ public sealed class Client : IDisposable
             var shouldBreak = packetInfo.Type == PacketOpCode.SendFinal;
 
             Packet packet = new(_version, packetInfo.Type, packetInfo.Data);
+            packet.Serialize(packetData);
 
-            await stream.WriteAsync(packet.Serialize(), token);
+            await stream.WriteAsync(packetData, token);
             await stream.ReadExactlyAsync(packetData, token);
 
             var acknowledgmentPacket = Packet.Deserialize(packetData);
@@ -103,13 +104,14 @@ public sealed class Client : IDisposable
 
     private void Handshake(NetworkStream stream)
     {
-        var helloPacket = Packet.Hello(_version).Serialize();
-        stream.Write(helloPacket);
+        Span<byte> packetData = stackalloc byte[Packet.Size];
 
-        Span<byte> helloReply = stackalloc byte[Packet.Size];
-        stream.ReadExactly(helloReply);
+        Packet.Hello(_version).Serialize(packetData);
+        stream.Write(packetData);
 
-        var helloReplyPacket = Packet.Deserialize(helloReply);
+        stream.ReadExactly(packetData);
+
+        var helloReplyPacket = Packet.Deserialize(packetData);
 
         PacketException.ThrowIfDifferentVersions(_version, helloReplyPacket.Version);
         PacketException.ThrowIfNotAckOpCode(helloReplyPacket.OpCode);
@@ -117,13 +119,13 @@ public sealed class Client : IDisposable
 
     private async Task HandshakeAsync(NetworkStream stream, CancellationToken token)
     {
-        var helloPacket = Packet.Hello(_version).Serialize();
-        await stream.WriteAsync(helloPacket, token);
+        var packetData = new byte[Packet.Size];
+        Packet.Hello(_version).Serialize(packetData);
 
-        var helloReply = new byte[Packet.Size];
-        await stream.ReadExactlyAsync(helloReply, token);
+        await stream.WriteAsync(packetData, token);
+        await stream.ReadExactlyAsync(packetData, token);
 
-        var helloReplyPacket = Packet.Deserialize(helloReply);
+        var helloReplyPacket = Packet.Deserialize(packetData);
 
         PacketException.ThrowIfDifferentVersions(_version, helloReplyPacket.Version);
         PacketException.ThrowIfNotAckOpCode(helloReplyPacket.OpCode);

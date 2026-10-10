@@ -18,7 +18,7 @@ public sealed class PacketException : Exception
 
     public static void ThrowIfUnsupportedVersion(PacketVersion version)
     {
-        if (!Enum.GetValues<PacketVersion>().Contains(version))
+        if (!Enum.IsDefined(version))
         {
             throw new PacketException($"Packet version ({version}) is not supported");
         }
@@ -26,7 +26,7 @@ public sealed class PacketException : Exception
 
     public static void ThrowIfIncorrectOpCode(PacketOpCode opCode)
     {
-        if (!Enum.GetValues<PacketOpCode>().Contains(opCode))
+        if (!Enum.IsDefined(opCode))
         {
             throw new PacketException($"Incorrect operation code: {opCode}");
         }

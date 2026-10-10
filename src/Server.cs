@@ -28,6 +28,8 @@ public sealed class Server : IDisposable
         using var client = _listener.AcceptTcpClient();
         using var stream = client.GetStream();
 
+        Span<byte> packetData = stackalloc byte[Packet.Size];
+
         try
         {
             var isAcknowledged = Handshake(stream);
@@ -37,7 +39,6 @@ public sealed class Server : IDisposable
                 return [];
             }
 
-            Span<byte> packetData = stackalloc byte[Packet.Size];
             List<byte> resultData = [];
 
             while (true)
@@ -46,6 +47,9 @@ public sealed class Server : IDisposable
                 var packet = Packet.Deserialize(packetData);
 
                 resultData.AddRange(packet.Data);
+
+                Packet.Success(PacketVersion.One).Serialize(packetData);
+                stream.Write(packetData);
 
                 if (packet.OpCode == PacketOpCode.SendFinal)
                 {
@@ -57,8 +61,8 @@ public sealed class Server : IDisposable
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            var errorBytes = Packet.Error(_version).Serialize();
-            stream.Write(errorBytes);
+            Packet.Error(_version).Serialize(packetData);
+            stream.Write(packetData);
 
             return [];
         }
@@ -75,6 +79,8 @@ public sealed class Server : IDisposable
         using var client = await _listener.AcceptTcpClientAsync(token);
         await using var stream = client.GetStream();
 
+        var packetData = new byte[Packet.Size];
+
         try
         {
             var isAcknowledged = await HandshakeAsync(stream, token);
@@ -84,7 +90,6 @@ public sealed class Server : IDisposable
                 return [];
             }
 
-            var packetData = new byte[Packet.Size];
             List<byte> resultData = [];
 
             while (true)
@@ -97,8 +102,8 @@ public sealed class Server : IDisposable
 
                 resultData.AddRange(packet.Data);
 
-                var successPacket = Packet.Success(PacketVersion.One).Serialize();
-                await stream.WriteAsync(successPacket, token);
+                Packet.Success(PacketVersion.One).Serialize(packetData);
+                await stream.WriteAsync(packetData, token);
 
                 if (packetOpCode == PacketOpCode.SendFinal)
                 {
@@ -110,8 +115,8 @@ public sealed class Server : IDisposable
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            var errorBytes = Packet.Error(_version).Serialize();
-            await stream.WriteAsync(errorBytes, token);
+            Packet.Error(_version).Serialize(packetData);
+            await stream.WriteAsync(packetData, token);
 
             return [];
         }
@@ -125,9 +130,10 @@ public sealed class Server : IDisposable
 
     private bool Handshake(NetworkStream stream)
     {
+        Span<byte> packetData = stackalloc byte[Packet.Size];
+
         try
         {
-            Span<byte> packetData = stackalloc byte[Packet.Size];
             stream.ReadExactly(packetData);
 
             var helloPacket = Packet.Deserialize(packetData);
@@ -144,9 +150,9 @@ public sealed class Server : IDisposable
         }
         catch
         {
-            var nackBytes = Packet.NotAcknowledged(_version).Serialize();
+            Packet.NotAcknowledged(_version).Serialize(packetData);
 
-            stream.Write(nackBytes);
+            stream.Write(packetData);
             stream.Flush();
 
             return false;
@@ -155,9 +161,10 @@ public sealed class Server : IDisposable
 
     private async Task<bool> HandshakeAsync(NetworkStream stream, CancellationToken token)
     {
+        var packetData = new byte[Packet.Size];
+
         try
         {
-            var packetData = new byte[Packet.Size];
             await stream.ReadExactlyAsync(packetData, token);
 
             var helloPacket = Packet.Deserialize(packetData);
@@ -165,18 +172,18 @@ public sealed class Server : IDisposable
             PacketException.ThrowIfDifferentVersions(_version, helloPacket.Version);
             PacketException.ThrowIfNotHelloOpCode(helloPacket.OpCode);
 
-            var ackBytes = Packet.Acknowledged(_version).Serialize();
+            Packet.Acknowledged(_version).Serialize(packetData);
 
-            await stream.WriteAsync(ackBytes, token);
+            await stream.WriteAsync(packetData, token);
             await stream.FlushAsync(token);
 
             return true;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            var nackBytes = Packet.NotAcknowledged(_version).Serialize();
+            Packet.NotAcknowledged(_version).Serialize(packetData);
 
-            await stream.WriteAsync(nackBytes, token);
+            await stream.WriteAsync(packetData, token);
             await stream.FlushAsync(token);
 
             return false;
